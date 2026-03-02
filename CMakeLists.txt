@@ -45,6 +45,7 @@ if(WIN32)
         shell32
         comdlg32
         comctl32
+        gdi32
     )
     # icon
     if(EXISTS "${CMAKE_SOURCE_DIR}/icon.rc")

@@ -14,8 +14,16 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shlobj.h>
+#include <shellapi.h>
+#include <commdlg.h>
+#include <commctrl.h>
 #pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "comdlg32.lib")
+#pragma comment(lib, "comctl32.lib")
+#else
+#include <unistd.h>
 #endif
+#include <SDL2/SDL_syswm.h>
 
 // settings path
 #ifdef _WIN32
