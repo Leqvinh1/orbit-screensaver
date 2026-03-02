@@ -40,8 +40,8 @@ static std::string getCfgPath() {
 }
 #endif
 
-#define FPS 25
-#define TICK_RATE (FPS * 10)
+#define FPS 60
+#define TICK_RATE 60
 #define NUM_BALLS 120
 #define DROP_TIME 20
 #define PLAYER_SIZE 80
@@ -353,6 +353,17 @@ static std::string getExeDir() {
 
 // the actual screensaver loop
 static void runScreensaver(bool isPreview, void* previewHandle) {
+#ifdef _WIN32
+    // MUST set SDL_WINDOWID before SDL_Init or embedding wont work
+    HWND parentHwnd = (HWND)previewHandle;
+    if(isPreview && parentHwnd) {
+        char envbuf[128];
+        sprintf(envbuf, "SDL_VIDEODRIVER=windib");
+        putenv(envbuf);
+        sprintf(envbuf, "SDL_WINDOWID=%llu", (unsigned long long)(uintptr_t)parentHwnd);
+        putenv(envbuf);
+    }
+#endif
     if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER)<0){fprintf(stderr,"sdl died lmao\n");return;}
     IMG_Init(IMG_INIT_PNG);
 
@@ -369,15 +380,14 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
     if(isPreview) {
 #ifdef _WIN32
-        char envbuf[64]; sprintf(envbuf,"SDL_VIDEODRIVER=windib"); putenv(envbuf);
-        sprintf(envbuf,"SDL_WINDOWID=%llu",(unsigned long long)(uintptr_t)previewHandle);
-        putenv(envbuf);
-        W=320; H=240;
-        win = SDL_CreateWindow("orbit",0,0,W,H,winFlags);
+        // get actual size of the preview box
+        RECT rc; GetClientRect(parentHwnd, &rc);
+        W = rc.right  - rc.left; if(W<=0) W=152;
+        H = rc.bottom - rc.top;  if(H<=0) H=112;
 #else
-        W=320; H=240;
-        win = SDL_CreateWindow("orbit",0,0,W,H,winFlags);
+        W=152; H=112;
 #endif
+        win = SDL_CreateWindow("orbit",0,0,W,H,winFlags);
     } else {
         SDL_DisplayMode dm; SDL_GetCurrentDisplayMode(0,&dm);
         W=dm.w; H=dm.h;
@@ -481,6 +491,10 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                     if(ev.type==SDL_MOUSEMOTION&&(ev.motion.x!=lastMouse.x||ev.motion.y!=lastMouse.y)){running=false;simRunning=false;}
                 }
             }
+#ifdef _WIN32
+            // die when parent preview window closes
+            if(isPreview && parentHwnd && !IsWindow(parentHwnd)){running=false;simRunning=false;}
+#endif
 
             // spawn balls
             for(int i=0;i<NUM_BALLS;i++){
