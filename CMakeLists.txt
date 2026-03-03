@@ -16,15 +16,12 @@ else()
     find_package(box2d REQUIRED)
 endif()
 
-add_executable(orbit_screensaver main.cpp)
-
-set_target_properties(orbit_screensaver PROPERTIES
-    WIN32_EXECUTABLE TRUE
-    OUTPUT_NAME "orbit_screensaver"
-)
-
+# main screensaver
+add_executable(orbit_screensaver WIN32 main.cpp)
+if(EXISTS "${CMAKE_SOURCE_DIR}/icon.rc")
+    target_sources(orbit_screensaver PRIVATE icon.rc)
+endif()
 target_include_directories(orbit_screensaver PRIVATE ${SDL2_INCLUDE_DIRS})
-
 target_link_libraries(orbit_screensaver PRIVATE
     ${SDL2_LIBRARIES}
     SDL2_image::SDL2_image
@@ -35,13 +32,15 @@ target_link_libraries(orbit_screensaver PRIVATE
     comctl32
     gdi32
     winmm
-    dwmapi
+    advapi32
 )
 
-if(EXISTS "${CMAKE_SOURCE_DIR}/icon.rc")
-    target_sources(orbit_screensaver PRIVATE icon.rc)
-endif()
+# stub scr
+add_executable(orbit_stub WIN32 stub_scr.cpp)
+target_link_libraries(orbit_stub PRIVATE shell32 advapi32)
+set_target_properties(orbit_stub PROPERTIES OUTPUT_NAME "orbit_stub")
 
+# copy assets
 set(ASSETS
     orb1.png orb2.png orb3.png orb4.png orb5.png
     orb6.png orb7.png orb8.png orb9.png orb10.png
