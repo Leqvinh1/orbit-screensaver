@@ -313,12 +313,10 @@ static std::string getAssetDir() {
     char path[MAX_PATH];
     SHGetFolderPathA(NULL,CSIDL_LOCAL_APPDATA,NULL,0,path);
     return std::string(path) + "\\orbit";
-#endif
 }
 
 // the actual screensaver loop
 static void runScreensaver(bool isPreview, void* previewHandle) {
-#ifdef _WIN32
     HWND parentHwnd = (HWND)previewHandle;
     if(isPreview && parentHwnd) {
         char envbuf[128];
@@ -327,7 +325,6 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
         sprintf(envbuf, "SDL_WINDOWID=%llu", (unsigned long long)(uintptr_t)parentHwnd);
         putenv(envbuf);
     }
-#endif
     if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER)<0){fprintf(stderr,"sdl died lmao\n");return;}
     IMG_Init(IMG_INIT_PNG);
 
@@ -335,16 +332,12 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
     SDL_Window* win;
     bool useTransparency = false;
 
-#ifdef _WIN32
     useTransparency = !isPreview && (g_settings.bg_mode==BG_TRANSPARENT||g_settings.bg_mode==BG_TINT||g_settings.bg_mode==BG_FADE||g_settings.bg_mode==BG_BLUR);
-#endif
 
     if(isPreview) {
-#ifdef _WIN32
         RECT rc; GetClientRect(parentHwnd, &rc);
         W = rc.right-rc.left; if(W<=0) W=152;
         H = rc.bottom-rc.top; if(H<=0) H=112;
-        // preview always uses SDL GL path
         SDL_GL_SetAttribute(SDL_GL_RED_SIZE,8);
         SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,8);
         SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,8);
@@ -387,8 +380,6 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
     }
 
 
-    // get sdlHwnd for fade tick updates later
-#ifdef _WIN32
     HWND sdlHwnd = nullptr;
     if(useTransparency) {
         SDL_SysWMinfo wmi2; SDL_VERSION(&wmi2.version);
@@ -406,7 +397,6 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             SetLayeredWindowAttributes(sdlHwnd,0,0,LWA_ALPHA);
         }
     }
-#endif
 
     // ortho projection, y down
     glMatrixMode(GL_PROJECTION);
@@ -543,19 +533,16 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 physAccum-=physStep;
             }
 
-            // fade logic
-#ifdef _WIN32
             if(g_settings.bg_mode==BG_FADE && !fadeDone && sdlHwnd) {
                 fadeTick++;
                 int alpha=fadeTick*255/fadeFrames; if(alpha>255)alpha=255;
                 SetLayeredWindowAttributes(sdlHwnd,0,alpha,LWA_ALPHA);
                 if(fadeTick>=fadeFrames)fadeDone=true;
             }
-#endif
 
             // draw
             int bm=g_settings.bg_mode;
-bool canTransp = useTransparency;
+            bool canTransp = useTransparency;
             if((bm==BG_TRANSPARENT||bm==BG_BLUR) && canTransp){
                 glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT);
             } else if(bm==BG_TINT && canTransp){
@@ -625,9 +612,7 @@ bool canTransp = useTransparency;
 }
 
 int main(int argc, char** argv) {
-#ifdef _WIN32
     timeBeginPeriod(1);
-#endif
     loadCfg();
 
 #ifdef _WIN32
@@ -648,8 +633,6 @@ int main(int argc, char** argv) {
     else if(doPreview) runScreensaver(true,(void*)previewHwnd);
     else runScreensaver(false,nullptr); // /s or bare launch
 #endif
-#ifdef _WIN32
     timeEndPeriod(1);
-#endif
     return 0;
 }
