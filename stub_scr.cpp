@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <shlobj.h>
 #include <string.h>
+#include <cstdio>
 #pragma comment(lib, "shell32.lib")
 
 // tiny stub - windows calls this .scr, we just forward to the real exe in appdata
