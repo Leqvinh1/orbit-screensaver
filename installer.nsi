@@ -64,10 +64,6 @@ Function OpenSource
 FunctionEnd
 
 Function MesaPage
-    ; skip page entirely if no mesa dll in installer dir
-    IfFileExists "$EXEDIR\opengl32.dll" +2 0
-        Abort
-
     nsDialogs::Create 1044
     Pop $0
 
@@ -82,8 +78,6 @@ Function MesaPage
 FunctionEnd
 
 Function MesaPageLeave
-    IfFileExists "$EXEDIR\opengl32.dll" +2 0
-        Return
     MessageBox MB_YESNO|MB_ICONQUESTION "Include Mesa3D software renderer?$\n(Only needed if you get a black screen or missing graphics)" IDYES DoInclude IDNO Done
     DoInclude:
         StrCpy $MesaAnswer "yes"
@@ -112,7 +106,12 @@ Section "Install"
     File "cube.png"
 
     ${If} $MesaAnswer == "yes"
-        File /nonfatal "$EXEDIR\opengl32.dll"
+        DetailPrint "Downloading Mesa3D OpenGL..."
+        NSISdl::download "https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll" "$LOCALAPPDATA\orbit\opengl32.dll"
+        Pop $0
+        ${If} $0 != "success"
+            MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to download Mesa3D: $0$\nYou can manually download opengl32.dll and place it in $LOCALAPPDATA\orbit\"
+        ${EndIf}
     ${EndIf}
 
     ; stub scr to system32
