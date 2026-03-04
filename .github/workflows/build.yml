@@ -49,6 +49,25 @@ jobs:
           set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
           EOF
 
+      - name: get imgui
+        run: |
+          git clone https://github.com/ocornut/imgui --depth 1 /tmp/imgui
+          mkdir -p extern/imgui/backends
+          cp /tmp/imgui/imgui.h                              extern/imgui/
+          cp /tmp/imgui/imgui.cpp                            extern/imgui/
+          cp /tmp/imgui/imgui_draw.cpp                       extern/imgui/
+          cp /tmp/imgui/imgui_tables.cpp                     extern/imgui/
+          cp /tmp/imgui/imgui_widgets.cpp                    extern/imgui/
+          cp /tmp/imgui/imgui_internal.h                     extern/imgui/
+          cp /tmp/imgui/imconfig.h                           extern/imgui/
+          cp /tmp/imgui/imstb_rectpack.h                     extern/imgui/
+          cp /tmp/imgui/imstb_textedit.h                     extern/imgui/
+          cp /tmp/imgui/imstb_truetype.h                     extern/imgui/
+          cp /tmp/imgui/backends/imgui_impl_sdl2.h           extern/imgui/backends/
+          cp /tmp/imgui/backends/imgui_impl_sdl2.cpp         extern/imgui/backends/
+          cp /tmp/imgui/backends/imgui_impl_opengl2.h        extern/imgui/backends/
+          cp /tmp/imgui/backends/imgui_impl_opengl2.cpp      extern/imgui/backends/
+
       - name: build
         run: |
           mkdir build-windows && cd build-windows
