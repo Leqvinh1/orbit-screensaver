@@ -6,6 +6,8 @@
 ![Stars](https://img.shields.io/badge/stars-1-blue)
 ![C++](https://img.shields.io/badge/language-C%2B%2B-red)
 ![Status](https://img.shields.io/badge/status-why--does--this--exist-lightgrey)
+![stars](https://img.shields.io/github/stars/MalikHw/orbit-screensaver?style=social)
+
 
 a stupid (but somehow cool) screensaver inspired by Orbit  
 yes, the extreme demon by Mindcap  
