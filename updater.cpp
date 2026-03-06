@@ -117,9 +117,9 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
         return 1;
     }
 
-    // download orbit-update.zip
-    std::string zipUrl="https://github.com/MalikHw/orbit-screensaver/releases/download/"+tag+"/orbit-update.zip";
-    std::string zipPath=exeDir+"\\orbit-update.zip";
+    // download orbit-screensaver.zip
+    std::string zipUrl="https://github.com/MalikHw/orbit-screensaver/releases/download/"+tag+"/orbit-screensaver.zip";
+    std::string zipPath=exeDir+"\\orbit-screensaver.zip";
 
     if(!downloadFile(zipUrl.c_str(),zipPath.c_str())){
         MessageBoxA(NULL,"Failed to download update.\nCheck your internet connection.","Orbit Updater",MB_OK|MB_ICONERROR);
