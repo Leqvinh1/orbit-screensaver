@@ -2,12 +2,15 @@
 #include <windows.h>
 #include <winhttp.h>
 #include <shlobj.h>
+#include <shldisp.h>
 #include <stdio.h>
 #include <string.h>
 #include <tlhelp32.h>
 #include <string>
 #pragma comment(lib, "winhttp.lib")
 #pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
 
 static std::string getExeDir() {
     char buf[MAX_PATH]; GetModuleFileNameA(NULL,buf,MAX_PATH);
@@ -15,7 +18,6 @@ static std::string getExeDir() {
 }
 
 static bool downloadFile(const char* url, const char* destPath) {
-    // parse url: skip https://
     const char* host_start = url;
     if(strncmp(url,"https://",8)==0) host_start+=8;
     const char* path_start = strchr(host_start,'/');
@@ -52,13 +54,42 @@ static bool downloadFile(const char* url, const char* destPath) {
 }
 
 static bool extractZip(const char* zipPath, const char* destDir) {
-    // Use PowerShell to extract - no extra deps needed
-    char cmd[1024];
-    snprintf(cmd,sizeof(cmd),
-        "powershell -NoProfile -Command \"Expand-Archive -Path '%s' -DestinationPath '%s' -Force\"",
-        zipPath, destDir);
-    int ret = system(cmd);
-    return ret==0;
+    wchar_t wzip[MAX_PATH], wdest[MAX_PATH];
+    MultiByteToWideChar(CP_ACP,0,zipPath,-1,wzip,MAX_PATH);
+    MultiByteToWideChar(CP_ACP,0,destDir,-1,wdest,MAX_PATH);
+
+    CoInitialize(NULL);
+    bool ok=false;
+    IShellDispatch* pShell=nullptr;
+    if(SUCCEEDED(CoCreateInstance(CLSID_Shell,NULL,CLSCTX_INPROC_SERVER,IID_IShellDispatch,(void**)&pShell))){
+        VARIANT vZip,vDest,vOpts;
+        VariantInit(&vZip); VariantInit(&vDest); VariantInit(&vOpts);
+        vZip.vt=VT_BSTR;  vZip.bstrVal=SysAllocString(wzip);
+        vDest.vt=VT_BSTR; vDest.bstrVal=SysAllocString(wdest);
+        vOpts.vt=VT_I4;   vOpts.lVal=4|16|256|1024;
+
+        Folder* pDestFolder=nullptr;
+        Folder* pZipFolder=nullptr;
+        if(SUCCEEDED(pShell->NameSpace(vDest,&pDestFolder))&&pDestFolder){
+            if(SUCCEEDED(pShell->NameSpace(vZip,&pZipFolder))&&pZipFolder){
+                FolderItems* pItems=nullptr;
+                if(SUCCEEDED(pZipFolder->Items(&pItems))&&pItems){
+                    VARIANT vItems; VariantInit(&vItems);
+                    vItems.vt=VT_DISPATCH; vItems.pdispVal=pItems;
+                    ok=SUCCEEDED(pDestFolder->CopyHere(vItems,vOpts));
+                    pItems->Release();
+                }
+                pZipFolder->Release();
+            }
+            pDestFolder->Release();
+        }
+        SysFreeString(vZip.bstrVal);
+        SysFreeString(vDest.bstrVal);
+        pShell->Release();
+        Sleep(2000);
+    }
+    CoUninitialize();
+    return ok;
 }
 
 static std::string fetchLatestTag() {
@@ -85,14 +116,11 @@ static std::string fetchLatestTag() {
 
 int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     std::string exeDir=getExeDir();
-    std::string scrPath=exeDir+"\\orbit_screensaver.scr";
 
-    // show simple progress window
     MessageBoxA(NULL,
         "Orbit Updater\n\nWaiting for screensaver to close, then updating...\n\nThis window will close automatically.",
         "Orbit Updater",MB_OK|MB_ICONINFORMATION);
 
-    // wait for screensaver process to die (max 30s)
     for(int i=0;i<60;i++){
         HANDLE snap=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
         bool found=false;
@@ -110,29 +138,25 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
         Sleep(500);
     }
 
-    // fetch latest tag to build download url
     std::string tag=fetchLatestTag();
     if(tag.empty()){
         MessageBoxA(NULL,"Failed to fetch latest version info.\nCheck your internet connection.","Orbit Updater",MB_OK|MB_ICONERROR);
         return 1;
     }
 
-    // download orbit-screensaver.zip
-    std::string zipUrl="https://github.com/MalikHw/orbit-screensaver/releases/download/"+tag+"/orbit-screensaver.zip";
-    std::string zipPath=exeDir+"\\orbit-screensaver.zip";
+    std::string zipUrl="https://github.com/MalikHw/orbit-screensaver/releases/download/"+tag+"/orbit-update.zip";
+    std::string zipPath=exeDir+"\\orbit-update.zip";
 
     if(!downloadFile(zipUrl.c_str(),zipPath.c_str())){
         MessageBoxA(NULL,"Failed to download update.\nCheck your internet connection.","Orbit Updater",MB_OK|MB_ICONERROR);
         return 1;
     }
 
-    // extract to install dir
     if(!extractZip(zipPath.c_str(),exeDir.c_str())){
         MessageBoxA(NULL,"Failed to extract update.","Orbit Updater",MB_OK|MB_ICONERROR);
         return 1;
     }
 
-    // cleanup zip
     DeleteFileA(zipPath.c_str());
 
     MessageBoxA(NULL,"Update installed successfully!\n\nReinstall the screensaver by right-clicking orbit_screensaver.scr -> Install.",

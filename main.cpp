@@ -26,6 +26,7 @@
 #include "imgui.h"
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_opengl2.h"
+#include "logo_data.h"
 
 #ifndef APP_VERSION
 #define APP_VERSION "dev"
@@ -181,7 +182,7 @@ static unsigned char* captureDesktop(int* outW, int* outH) {
     if(hDesk) CloseDesktop(hDesk);
     return pixels;
 }
-// this blur runs on the CPU like a retarded dumbass
+// this blur runs on the CPU like an idiot, don't touch it
 static void boxBlur(unsigned char* pixels, int W, int H, int radius) {
     unsigned char* tmp=(unsigned char*)malloc(W*H*4);
     for(int y=0;y<H;y++) for(int x=0;x<W;x++){
@@ -252,7 +253,7 @@ static void drawCircleFallback(float cx,float cy,float r){
 struct Ball { b2Body* body; float radius; int orbIdx; bool isPlayer; };
 
 static void downloadMesa3D() {
-    const char* url = "https://github.com/MalikHw/orbit-screensaver/releases/download/mesa3d/opengl32.dll";
+    const char* url = "https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll";
     std::string destPath = getExeDir() + "\\opengl32.dll";
 
     int res = MessageBoxA(NULL,
@@ -303,7 +304,6 @@ static void downloadMesa3D() {
 
 static bool g_preview_clicked = false;
 
-// megahack ahh UI
 static bool runImGuiSettings() {
     if(SDL_Init(SDL_INIT_VIDEO)<0) return false;
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,0);
@@ -327,6 +327,25 @@ static bool runImGuiSettings() {
 
     ImGui_ImplSDL2_InitForOpenGL(win,ctx);
     ImGui_ImplOpenGL2_Init();
+
+    GLuint logoTex=0;
+    {
+        SDL_RWops* rw=SDL_RWFromConstMem(logo_png,logo_png_len);
+        SDL_Surface* surf=IMG_LoadPNG_RW(rw);
+        SDL_RWclose(rw);
+        if(surf){
+            SDL_Surface* conv=SDL_ConvertSurfaceFormat(surf,SDL_PIXELFORMAT_RGBA32,0);
+            SDL_FreeSurface(surf);
+            if(conv){
+                glGenTextures(1,&logoTex);
+                glBindTexture(GL_TEXTURE_2D,logoTex);
+                glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,conv->w,conv->h,0,GL_RGBA,GL_UNSIGNED_BYTE,conv->pixels);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+                SDL_FreeSurface(conv);
+            }
+        }
+    }
 
     const char* bgNames[]={"Black","Custom Color","Image","Transparent (snapshot)","Blur (snapshot)"};
     const char* fitNames[]={"Stretch","Zoom","Tile"};
@@ -471,7 +490,7 @@ static bool runImGuiSettings() {
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
         if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) downloadMesa3D();
-        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get white squares on bad gpu");
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get a white square!");
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f),"by MalikHw47");
         ImGui::Spacing();
@@ -491,6 +510,19 @@ static bool runImGuiSettings() {
         ImGui::SameLine();
         if(ImGui::Button("Donate!",ImVec2(150,22)))           ShellExecuteA(0,"open","https://ko-fi.com/malikhw47",0,0,SW_SHOW);
 
+        if(logoTex){
+            const float logoSize=40.0f;
+            ImVec2 winPos=ImGui::GetWindowPos();
+            ImVec2 winSize=ImGui::GetWindowSize();
+            ImVec2 logoPos=ImVec2(winPos.x+winSize.x-logoSize-6, winPos.y+winSize.y-logoSize-6);
+            ImGui::GetWindowDrawList()->AddImage(
+                (ImTextureID)(uintptr_t)logoTex,
+                logoPos,
+                ImVec2(logoPos.x+logoSize, logoPos.y+logoSize),
+                ImVec2(0,0), ImVec2(1,1),
+                IM_COL32(255,255,255,180));
+        }
+
         ImGui::End();
         ImGui::Render();
         glViewport(0,0,W,H);
@@ -502,6 +534,7 @@ static bool runImGuiSettings() {
     ImGui_ImplOpenGL2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
+    if(logoTex) glDeleteTextures(1,&logoTex);
     SDL_GL_DeleteContext(ctx);
     SDL_DestroyWindow(win);
     SDL_Quit();
@@ -596,7 +629,8 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             while(SDL_PollEvent(&ev)){
                 if(ev.type==SDL_QUIT){running=false;simRunning=false;}
                 if(globalTime>grace&&!isPreview){
-                    if(ev.type==SDL_KEYDOWN||ev.type==SDL_MOUSEBUTTONDOWN){running=false;simRunning=false;}
+                    if(ev.type==SDL_KEYDOWN&&ev.key.keysym.sym!=SDLK_PRINTSCREEN){running=false;simRunning=false;}
+                    if(ev.type==SDL_MOUSEBUTTONDOWN){running=false;simRunning=false;}
                     if(ev.type==SDL_MOUSEMOTION&&(ev.motion.x!=lastMouse.x||ev.motion.y!=lastMouse.y)){running=false;simRunning=false;}
                 }
             }
