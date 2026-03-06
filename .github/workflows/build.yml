@@ -98,16 +98,18 @@ jobs:
           find /usr/x86_64-w64-mingw32          -name "libwinpthread-1.dll" -exec cp {} dist/ \; 2>/dev/null || true
           cp orb*.png cube.png dist/
           cp README.txt dist/
-          cd dist && zip -r ../orbit-screensaver.zip .
+          # both zips same contents - orbit-screensaver for new users, orbit-update for auto updater
+          cd dist && zip -r ../orbit-screensaver.zip . && cd ..
+          cp orbit-screensaver.zip orbit-update.zip
 
-      - name: upload artifact(s)
+      - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: orbit-screensaver-bundle
+          name: orbit-screensaver
           path: |
             orbit-screensaver.zip
+            orbit-update.zip
           retention-days: 30
-
 
   release:
     needs: build-windows
@@ -125,5 +127,7 @@ jobs:
         with:
           tag_name: ${{ needs.build-windows.outputs.tag }}
           name: AUTOBUILD ${{ needs.build-windows.outputs.tag }}
-          body: autofuckingbuilt (read readme.txt)
-          files: artifacts/orbit-screensaver.zip
+          body: autofuckingbuilt
+          files: |
+            artifacts/orbit-screensaver.zip
+            artifacts/orbit-update.zip
