@@ -60,13 +60,14 @@ struct Settings {
     int   orb_count;
     bool  auto_update_check;
     bool  auto_update_install;
+    int   cube_chance; // 0-100%
 };
 static Settings g_settings = {
     10, 60, BG_BLACK, {0.12f,0.12f,0.12f}, "", FIT_STRETCH, "",
-    false, 1.0f, 120, true, false
+    false, 1.0f, 120, true, false, 50
 };
 
-// Miku─ Paths
+// ── Paths ─────────────────────────────────────────────────────────────────
 static std::string getExeDir() {
     char buf[MAX_PATH]; GetModuleFileNameA(NULL,buf,MAX_PATH);
     std::string s(buf); return s.substr(0,s.rfind('\\'));
@@ -75,7 +76,7 @@ static std::string getCfgPath() {
     return getExeDir()+"\\settings.ini";
 }
 
-// Miku─ Config
+// ── Config ────────────────────────────────────────────────────────────────
 static void loadCfg() {
     FILE* f=fopen(getCfgPath().c_str(),"r"); if(!f)return;
     char line[640];
@@ -91,6 +92,7 @@ static void loadCfg() {
         if(sscanf(line,"orb_count=%d",&iv)==1)          g_settings.orb_count=iv;
         if(sscanf(line,"auto_update_check=%d",&iv)==1)  g_settings.auto_update_check=(iv!=0);
         if(sscanf(line,"auto_update_install=%d",&iv)==1)g_settings.auto_update_install=(iv!=0);
+        if(sscanf(line,"cube_chance=%d",&iv)==1)        g_settings.cube_chance=iv;
         if(sscanf(line,"bg_image=%511[^\n]",sv)==1)     strncpy(g_settings.bg_image,sv,511);
         if(sscanf(line,"cube_path=%511[^\n]",sv)==1)    strncpy(g_settings.cube_path,sv,511);
     }
@@ -108,6 +110,7 @@ static void saveCfg() {
     fprintf(f,"orb_count=%d\n",g_settings.orb_count);
     fprintf(f,"auto_update_check=%d\n",(int)g_settings.auto_update_check);
     fprintf(f,"auto_update_install=%d\n",(int)g_settings.auto_update_install);
+    fprintf(f,"cube_chance=%d\n",g_settings.cube_chance);
     fprintf(f,"bg_image=%s\n",g_settings.bg_image);
     fprintf(f,"cube_path=%s\n",g_settings.cube_path);
     fclose(f);
@@ -200,7 +203,7 @@ static void boxBlur(unsigned char* pixels, int W, int H, int radius) {
     free(tmp);
 }
 
-// Miku─ Texture ────
+// ── Texture ───────────────────────────────────────────────────────────────
 struct Texture { GLuint id; int w,h; bool ok; };
 static Texture loadTexture(const char* path) {
     Texture t={0,0,0,false};
@@ -255,7 +258,59 @@ static void drawCircleFallback(float cx,float cy,float r){
 
 struct Ball { b2Body* body; float radius; int orbIdx; bool isPlayer; };
 
-// Miku─ ImGui MegaHack-ahh
+static void downloadMesa3D() {
+    const char* url = "https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll";
+    std::string destPath = getExeDir() + "\\opengl32.dll";
+
+    // confirmation popup with warning text
+    int res = MessageBoxA(NULL,
+        "Please Only Use when showing white square instead,\nand/or you don't want GPU usage.\n\nDownload Mesa3D software OpenGL renderer?",
+        "Install Mesa3D", MB_OKCANCEL | MB_ICONINFORMATION);
+    if(res != IDOK) return;
+
+    // parse url manually (reuse same logic as updater)
+    const char* host_start = url + 8; // skip https://
+    const char* path_start = strchr(host_start, '/');
+    if(!path_start) { MessageBoxA(NULL,"Invalid URL.","Error",MB_OK|MB_ICONERROR); return; }
+
+    std::string host(host_start, path_start - host_start);
+    std::string path(path_start);
+    wchar_t whost[256], wpath[512];
+    MultiByteToWideChar(CP_ACP,0,host.c_str(),-1,whost,256);
+    MultiByteToWideChar(CP_ACP,0,path.c_str(),-1,wpath,512);
+
+    retry:
+    HINTERNET hSession=WinHttpOpen(L"OrbitUpdater/1.0",WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,WINHTTP_NO_PROXY_NAME,WINHTTP_NO_PROXY_BYPASS,0);
+    HINTERNET hConnect=hSession?WinHttpConnect(hSession,whost,INTERNET_DEFAULT_HTTPS_PORT,0):nullptr;
+    HINTERNET hRequest=hConnect?WinHttpOpenRequest(hConnect,L"GET",wpath,NULL,WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES,WINHTTP_FLAG_SECURE):nullptr;
+    bool ok=false;
+    if(hRequest){
+        WinHttpAddRequestHeaders(hRequest,L"User-Agent: OrbitUpdater",-1,WINHTTP_ADDREQ_FLAG_ADD);
+        if(WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0,WINHTTP_NO_REQUEST_DATA,0,0,0)
+           && WinHttpReceiveResponse(hRequest,NULL)){
+            FILE* f=fopen(destPath.c_str(),"wb");
+            if(f){
+                char buf[8192]; DWORD read=0;
+                while(WinHttpReadData(hRequest,buf,sizeof(buf),&read)&&read>0) fwrite(buf,1,read,f);
+                fclose(f); ok=true;
+            }
+        }
+    }
+    if(hRequest) WinHttpCloseHandle(hRequest);
+    if(hConnect) WinHttpCloseHandle(hConnect);
+    if(hSession) WinHttpCloseHandle(hSession);
+
+    if(!ok){
+        int retry=MessageBoxA(NULL,
+            "Failed to download Mesa3D.\nCheck your internet connection.",
+            "Download Error", MB_RETRYCANCEL | MB_ICONERROR);
+        if(retry==IDRETRY) goto retry;
+        return;
+    }
+    MessageBoxA(NULL,"Mesa3D installed successfully!\nopengl32.dll is now in your orbit folder.","Mesa3D",MB_OK|MB_ICONINFORMATION);
+}
+
+// ── ImGui MegaHack-ahh ────────────────────────────────────────────────────────
 static bool g_preview_clicked = false;
 
 static bool runImGuiSettings() {
@@ -329,11 +384,18 @@ static bool runImGuiSettings() {
         ImGui::SetNextItemWidth(120);
         ImGui::InputInt("Orb count",&g_settings.orb_count,1);
         if(g_settings.orb_count<1)g_settings.orb_count=1;
+        if(g_settings.orb_count < 20) ImGui::OpenPopup("bro");
         ImGui::SameLine();
         if(ImGui::SmallButton("Low"))  g_settings.orb_count=30;  ImGui::SameLine();
         if(ImGui::SmallButton("Med"))  g_settings.orb_count=80;  ImGui::SameLine();
         if(ImGui::SmallButton("High")) g_settings.orb_count=120; ImGui::SameLine();
         if(ImGui::SmallButton("Giga")) g_settings.orb_count=210;
+
+        if(ImGui::BeginPopupModal("bro",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){
+            ImGui::Text("bro what the fuck?\xF0\x9F\x98\xAD, how is even THAT!?");
+            if(ImGui::Button("yes")) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
 
         ImGui::SetNextItemWidth(180);
         ImGui::SliderFloat("Orb size",&g_settings.orb_scale,0.3f,3.0f);
@@ -341,6 +403,10 @@ static bool runImGuiSettings() {
         if(ImGui::SmallButton("S")) g_settings.orb_scale=0.5f; ImGui::SameLine();
         if(ImGui::SmallButton("N")) g_settings.orb_scale=1.0f; ImGui::SameLine();
         if(ImGui::SmallButton("L")) g_settings.orb_scale=1.5f;
+
+        ImGui::SetNextItemWidth(180);
+        ImGui::SliderInt("Cube chance",&g_settings.cube_chance,0,100);
+        ImGui::SameLine(); ImGui::TextDisabled("%%");
         ImGui::Spacing();
 
         // cube path
@@ -417,6 +483,9 @@ static bool runImGuiSettings() {
 
         // links
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
+        if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) downloadMesa3D();
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get a white square!");
+        ImGui::Spacing();
         ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f),"by MalikHw47");
         ImGui::Spacing();
         if(ImGui::SmallButton("MalikHw47")) ShellExecuteA(0,"open","https://malikhw.github.io",0,0,SW_SHOW);
@@ -452,7 +521,7 @@ static bool runImGuiSettings() {
     return g_preview_clicked;
 }
 
-// Miku─ Screensaver loop
+// ── Screensaver loop ──────────────────────────────────────────────────────
 static void runScreensaver(bool isPreview, void* previewHandle) {
     HWND parentHwnd=(HWND)previewHandle;
     if(isPreview&&parentHwnd){
@@ -527,9 +596,9 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
         std::vector<Ball> balls;
         int globalTime=0;bool fillingDone=false,draining=false;
-        int nextSpawn=0;
+        int nextSpawn=0; // index of next orb to spawn
         bool playerSpawned=false;
-        Uint32 allSpawnedAt=0;
+        Uint32 allSpawnedAt=0; // timestamp when last orb was queued
         SDL_Point lastMouse;SDL_GetMouseState(&lastMouse.x,&lastMouse.y);
         int grace=60;
         Uint32 lastTick=SDL_GetTicks();float physAccum=0;const float physStep=1.0f/fps;
@@ -547,8 +616,8 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             }
             if(isPreview&&parentHwnd&&!IsWindow(parentHwnd)){running=false;simRunning=false;}
 
-
-            
+            // spawn queue: use >= so no orb is ever skipped due to missed ticks
+            // nextSpawn=0 fires on frame 1 (globalTime>=0 is always true), fixing off-by-one
             while(nextSpawn < numBalls && globalTime >= dropTime * nextSpawn){
                 float radius=(40+rand()%20)*g_settings.orb_scale;
                 b2BodyDef bd;bd.type=b2_dynamicBody;
@@ -562,22 +631,24 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 balls.push_back(ball);
                 nextSpawn++;
             }
-
-            if(!playerSpawned && nextSpawn >= numBalls){
-                b2BodyDef bd;bd.type=b2_dynamicBody;bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
-                b2Body* body=world.CreateBody(&bd);
-                b2PolygonShape ps;ps.SetAsBox(PLAYER_SIZE*0.5f*g_settings.orb_scale/PPM,PLAYER_SIZE*0.5f*g_settings.orb_scale/PPM);
-                b2FixtureDef fd;fd.shape=&ps;fd.density=1.0f;fd.restitution=0.5f;fd.friction=0.7f;
-                body->CreateFixture(&fd);
-                Ball ball;ball.body=body;ball.radius=PLAYER_SIZE*0.5f*g_settings.orb_scale;ball.orbIdx=0;ball.isPlayer=true;
-                balls.push_back(ball);
-                playerSpawned=true;
+            // player cube: spawn alongside orbs (after first few), with random chance
+            if(!playerSpawned && nextSpawn >= 1){
+                playerSpawned=true; // mark so we don't re-roll every frame
+                if((rand()%100) < g_settings.cube_chance){
+                    b2BodyDef bd;bd.type=b2_dynamicBody;bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
+                    b2Body* body=world.CreateBody(&bd);
+                    b2PolygonShape ps;ps.SetAsBox(PLAYER_SIZE*0.5f*g_settings.orb_scale/PPM,PLAYER_SIZE*0.5f*g_settings.orb_scale/PPM);
+                    b2FixtureDef fd;fd.shape=&ps;fd.density=1.0f;fd.restitution=0.5f;fd.friction=0.7f;
+                    body->CreateFixture(&fd);
+                    Ball ball;ball.body=body;ball.radius=PLAYER_SIZE*0.5f*g_settings.orb_scale;ball.orbIdx=0;ball.isPlayer=true;
+                    balls.push_back(ball);
+                }
             }
 
-            // destroy ground once ALL orbs have spawned, after a 5-6s delay so users wont cry
+            // destroy ground once ALL orbs have spawned, after a 5-6s delay
             if(!g_settings.no_ground&&!fillingDone && nextSpawn>=numBalls){
                 if(allSpawnedAt==0) allSpawnedAt=SDL_GetTicks();
-                Uint32 delay=5000+(rand()%1001);
+                Uint32 delay=5000+(rand()%1001); // 5000-6000ms
                 if(SDL_GetTicks()-allSpawnedAt >= delay){
                     fillingDone=true;
                     draining=true;
@@ -640,7 +711,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
     IMG_Quit();SDL_Quit();
 }
 
-// Miku─ Entry point 
+// ── Entry point ───────────────────────────────────────────────────────────
 int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     timeBeginPeriod(1);
     loadCfg();
