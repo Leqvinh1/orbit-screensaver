@@ -39,6 +39,7 @@ Section "Install"
     File "orb9.png"
     File "orb10.png"
     File "cube.png"
+    File "updater.exe"
 
     ${If} $MesaAnswer == "yes"
         inetc::get /CAPTION "Downloading Mesa3D..." /BANNER "Fetching OpenGL software renderer..." "https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll" "$PROFILE\orbit\opengl32.dll" /END
