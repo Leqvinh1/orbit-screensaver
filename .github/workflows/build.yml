@@ -15,9 +15,7 @@ jobs:
           submodules: recursive
 
       - name: deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y mingw-w64 cmake build-essential wget unzip nsis
+        run: sudo apt-get update -qq && sudo apt-get install -y mingw-w64 cmake build-essential wget unzip
 
       - name: set version
         id: version
@@ -37,10 +35,8 @@ jobs:
 
       - name: get box2d
         run: |
-          if [ ! -d "extern/box2d" ]; then
-            mkdir -p extern
-            git clone https://github.com/erincatto/box2d --branch v2.4.1 --depth 1 extern/box2d
-          fi
+          mkdir -p extern
+          git clone https://github.com/erincatto/box2d --branch v2.4.1 --depth 1 extern/box2d
 
       - name: get imgui
         run: |
@@ -85,44 +81,31 @@ jobs:
             -DAPP_VERSION="${{ steps.version.outputs.tag }}"
           make -j$(nproc)
 
-      - name: collect files
+      - name: collect and zip
         run: |
-          mkdir -p dist-windows
+          mkdir -p dist
           # handle mingw ignoring SUFFIX .scr
           if [ -f build-windows/orbit_screensaver.scr ]; then
-            cp build-windows/orbit_screensaver.scr dist-windows/orbit_screensaver.scr
+            cp build-windows/orbit_screensaver.scr dist/orbit_screensaver.scr
           else
-            cp build-windows/orbit_screensaver.exe dist-windows/orbit_screensaver.scr
+            cp build-windows/orbit_screensaver.exe dist/orbit_screensaver.scr
           fi
-          cp build-windows/updater.exe dist-windows/
-          cp /usr/x86_64-w64-mingw32/bin/SDL2.dll       dist-windows/
-          cp /usr/x86_64-w64-mingw32/bin/SDL2_image.dll dist-windows/
-          find /usr/lib/gcc/x86_64-w64-mingw32 -name "libgcc_s_seh-1.dll" -exec cp {} dist-windows/ \; 2>/dev/null || true
-          find /usr/lib/gcc/x86_64-w64-mingw32 -name "libstdc++-6.dll"    -exec cp {} dist-windows/ \; 2>/dev/null || true
-          find /usr/x86_64-w64-mingw32          -name "libwinpthread-1.dll" -exec cp {} dist-windows/ \; 2>/dev/null || true
-          cp orb*.png cube.png dist-windows/
-
-      - name: build installer
-        run: |
-          wget -q https://nsis.sourceforge.io/mediawiki/images/c/c9/Inetc.zip -O /tmp/inetc.zip
-          sudo unzip -o /tmp/inetc.zip Plugins/x86-unicode/INetC.dll -d /usr/share/nsis/
-          cp installer.nsi dist-windows/
-          cd dist-windows && makensis installer.nsi
-
-      - name: package update zip
-        run: |
-          cd dist-windows
-          zip -r ../orbit-update.zip orbit_screensaver.scr updater.exe SDL2.dll SDL2_image.dll orb*.png cube.png \
-            libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll 2>/dev/null || \
-          zip -r ../orbit-update.zip orbit_screensaver.scr updater.exe SDL2.dll SDL2_image.dll orb*.png cube.png
+          cp build-windows/updater.exe             dist/
+          cp /usr/x86_64-w64-mingw32/bin/SDL2.dll       dist/
+          cp /usr/x86_64-w64-mingw32/bin/SDL2_image.dll dist/
+          find /usr/lib/gcc/x86_64-w64-mingw32 -name "libgcc_s_seh-1.dll"  -exec cp {} dist/ \; 2>/dev/null || true
+          find /usr/lib/gcc/x86_64-w64-mingw32 -name "libstdc++-6.dll"     -exec cp {} dist/ \; 2>/dev/null || true
+          find /usr/x86_64-w64-mingw32          -name "libwinpthread-1.dll" -exec cp {} dist/ \; 2>/dev/null || true
+          cp orb*.png cube.png dist/
+          cp README.txt dist/
+          cd dist && zip -r ../orbit-screensaver.zip .
 
       - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: orbit-windows
-          path: |
-            dist-windows/orbit-setup.exe
-            orbit-update.zip
+          name: orbit-screensaver
+          path: orbit-screensaver.zip
+          retention-days: 30
 
   release:
     needs: build-windows
@@ -132,15 +115,13 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: orbit-windows
+          name: orbit-screensaver
           path: artifacts/
 
       - name: release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.build-windows.outputs.tag }}
-          name: AUTOBUILD
-          body: autofuckingbuilt
-          files: |
-            artifacts/dist-windows/orbit-setup.exe
-            artifacts/orbit-update.zip
+          name: AUTOBUILD ${{ needs.build-windows.outputs.tag }}
+          body: autofuckingbuilt (read readme.txt)
+          files: artifacts/orbit-screensaver.zip
