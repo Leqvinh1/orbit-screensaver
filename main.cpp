@@ -252,7 +252,7 @@ static void drawCircleFallback(float cx,float cy,float r){
 struct Ball { b2Body* body; float radius; int orbIdx; bool isPlayer; };
 
 static void downloadMesa3D() {
-    const char* url = "https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll";
+    const char* url = "https://github.com/MalikHw/orbit-screensaver/releases/download/mesa3d/opengl32.dll";
     std::string destPath = getExeDir() + "\\opengl32.dll";
 
     int res = MessageBoxA(NULL,
@@ -471,7 +471,7 @@ static bool runImGuiSettings() {
 
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
         if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) downloadMesa3D();
-        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get a white square!");
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get white squares on bad gpu");
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f),"by MalikHw47");
         ImGui::Spacing();
