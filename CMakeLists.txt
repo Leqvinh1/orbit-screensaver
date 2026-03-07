@@ -42,7 +42,7 @@ add_executable(updater WIN32 updater.cpp)
 if(EXISTS "${CMAKE_SOURCE_DIR}/icon.rc")
     target_sources(updater PRIVATE icon.rc)
 endif()
-target_link_libraries(updater PRIVATE shell32 winhttp advapi32)
+target_link_libraries(updater PRIVATE shell32 winhttp advapi32 ole32 oleaut32 urlmon)
 set_target_properties(updater PROPERTIES OUTPUT_NAME "updater")
 
 # copy assets
