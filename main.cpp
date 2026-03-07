@@ -253,7 +253,7 @@ static void drawCircleFallback(float cx,float cy,float r){
 struct Ball { b2Body* body; float radius; int orbIdx; bool isPlayer; };
 
 static void downloadMesa3D() {
-    const char* url = "https://github.com/MalikHw/orbit-screensaver-cpp/releases/download/mesa3d/opengl32.dll";
+    const char* url = "https://github.com/MalikHw/orbit-screensaver/releases/download/mesa3d/opengl32.dll";
     std::string destPath = getExeDir() + "\\opengl32.dll";
 
     int res = MessageBoxA(NULL,
