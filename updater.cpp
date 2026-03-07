@@ -1,6 +1,7 @@
 // thx github for the api
 #include <windows.h>
 #include <winhttp.h>
+#include <urlmon.h>
 #include <shlobj.h>
 #include <shldisp.h>
 #include <stdio.h>
@@ -8,6 +9,7 @@
 #include <tlhelp32.h>
 #include <string>
 #pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "urlmon.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "oleaut32.lib")
@@ -18,39 +20,7 @@ static std::string getExeDir() {
 }
 
 static bool downloadFile(const char* url, const char* destPath) {
-    const char* host_start = url;
-    if(strncmp(url,"https://",8)==0) host_start+=8;
-    const char* path_start = strchr(host_start,'/');
-    if(!path_start) return false;
-
-    std::string host(host_start, path_start-host_start);
-    std::string path(path_start);
-
-    wchar_t whost[256], wpath[512];
-    MultiByteToWideChar(CP_ACP,0,host.c_str(),-1,whost,256);
-    MultiByteToWideChar(CP_ACP,0,path.c_str(),-1,wpath,512);
-
-    HINTERNET hSession=WinHttpOpen(L"OrbitUpdater/1.0",WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,WINHTTP_NO_PROXY_NAME,WINHTTP_NO_PROXY_BYPASS,0);
-    if(!hSession) return false;
-    HINTERNET hConnect=WinHttpConnect(hSession,whost,INTERNET_DEFAULT_HTTPS_PORT,0);
-    if(!hConnect){WinHttpCloseHandle(hSession);return false;}
-    HINTERNET hRequest=WinHttpOpenRequest(hConnect,L"GET",wpath,NULL,WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES,WINHTTP_FLAG_SECURE);
-    if(!hRequest){WinHttpCloseHandle(hConnect);WinHttpCloseHandle(hSession);return false;}
-    WinHttpAddRequestHeaders(hRequest,L"User-Agent: OrbitUpdater",-1,WINHTTP_ADDREQ_FLAG_ADD);
-
-    bool ok=false;
-    if(WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0,WINHTTP_NO_REQUEST_DATA,0,0,0)
-       &&WinHttpReceiveResponse(hRequest,NULL)){
-        FILE* f=fopen(destPath,"wb");
-        if(f){
-            char buf[8192]; DWORD read=0;
-            while(WinHttpReadData(hRequest,buf,sizeof(buf),&read)&&read>0)
-                fwrite(buf,1,read,f);
-            fclose(f); ok=true;
-        }
-    }
-    WinHttpCloseHandle(hRequest);WinHttpCloseHandle(hConnect);WinHttpCloseHandle(hSession);
-    return ok;
+    return URLDownloadToFileA(NULL,url,destPath,0,NULL)==S_OK;
 }
 
 static bool extractZip(const char* zipPath, const char* destDir) {
