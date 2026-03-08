@@ -376,11 +376,7 @@ static bool runImGuiSettings() {
 
     static std::string latestTag="";
     static bool updateChecked=false;
-    if(!updateChecked){
-        static bool checkStarted=false;
-        if(!checkStarted){ checkStarted=true; CreateThread(NULL,0,tagCheckThread,NULL,0,NULL); }
-        if(g_tagCheck.done){ latestTag=std::string(g_tagCheck.tag); updateChecked=true; }
-    }
+    static bool checkingNow=false;
 
     bool running=true;
     g_preview_clicked=false;
@@ -496,8 +492,15 @@ static bool runImGuiSettings() {
         } else if(g_updateDL && g_updateDL->done==-1){
             ImGui::TextColored(ImVec4(1,0.3f,0.3f,1),"Download failed!");
         } else {
-            if(!updateChecked){
-                ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1),"Checking for updates...");
+            if(checkingNow){
+                ImGui::TextColored(ImVec4(1,1,0,1),"Checking...");
+            } else if(!updateChecked){
+                if(ImGui::Button("Check for updates",ImVec2(200,24))){
+                    checkingNow=true;
+                    latestTag=fetchLatestTag();
+                    updateChecked=true;
+                    checkingNow=false;
+                }
             } else if(latestTag.empty()||latestTag==APP_VERSION){
                 ImGui::TextColored(ImVec4(0,1,0,1),"You're up to date! (%s)",APP_VERSION);
             } else {
