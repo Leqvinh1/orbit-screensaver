@@ -59,7 +59,7 @@ struct Settings {
     bool  no_ground;
     float orb_scale;
     int   orb_count;
-    bool  auto_update_check;
+    bool  auto_update_check; // kept for ini compat, ignored
     bool  auto_update_install;
     int   cube_chance;
 };
@@ -150,16 +150,38 @@ static void launchUpdater() {
     ShellExecuteA(NULL,"open",updaterPath.c_str(),NULL,NULL,SW_SHOW);
 }
 
-static void showUpdateToast(const std::string& newTag) {
-    NOTIFYICONDATAA nid={};
-    nid.cbSize=sizeof(nid);
-    nid.uFlags=NIF_INFO;
-    nid.dwInfoFlags=NIIF_INFO;
-    strcpy(nid.szInfoTitle,"Orbit Screensaver Update");
-    snprintf(nid.szInfo,sizeof(nid.szInfo),"New version %s available! Open settings to install.",newTag.c_str());
-    nid.uTimeout=10000;
-    Shell_NotifyIconA(NIM_MODIFY,&nid);
+struct UpdateDownloadState {
+    volatile float progress;
+    volatile int   done; // 0=running, 1=ok, -1=fail
+    std::string    url;
+    std::string    destPath;
+};
+struct UpdateCallback : public IBindStatusCallback {
+    UpdateDownloadState* s;
+    UpdateCallback(UpdateDownloadState* s):s(s){}
+    HRESULT STDMETHODCALLTYPE OnProgress(ULONG prog,ULONG progMax,ULONG,LPCWSTR) override {
+        if(progMax>0) s->progress=(float)prog/(float)progMax; return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE OnStartBinding(DWORD,IBinding*) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE GetPriority(LONG*) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE OnLowResource(DWORD) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE OnStopBinding(HRESULT,LPCWSTR) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE GetBindInfo(DWORD*,BINDINFO*) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE OnDataAvailable(DWORD,DWORD,FORMATETC*,STGMEDIUM*) override{return E_NOTIMPL;}
+    HRESULT STDMETHODCALLTYPE OnObjectAvailable(REFIID,IUnknown*) override{return E_NOTIMPL;}
+    ULONG STDMETHODCALLTYPE AddRef() override{return 1;}
+    ULONG STDMETHODCALLTYPE Release() override{return 1;}
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID,void**) override{return E_NOINTERFACE;}
+};
+static DWORD WINAPI updateDownloadThread(void* param){
+    UpdateDownloadState* s=(UpdateDownloadState*)param;
+    UpdateCallback cb(s);
+    HRESULT hr=URLDownloadToFileA(NULL,s->url.c_str(),s->destPath.c_str(),0,&cb);
+    s->done=(hr==S_OK)?1:-1;
+    return 0;
 }
+static UpdateDownloadState* g_updateDL=nullptr;
+static std::string g_updateTag="";
 
 static unsigned char* captureDesktop(int* outW, int* outH) {
     int W=GetSystemMetrics(SM_CXSCREEN), H=GetSystemMetrics(SM_CYSCREEN);
@@ -286,12 +308,8 @@ static DWORD WINAPI mesaThread(void* param){
 }
 static MesaDownloadState* g_mesaDL=nullptr;
 
-static void downloadMesa3D() {
+static void startMesaDownload() {
     const char* url = "https://github.com/MalikHw/orbit-screensaver/releases/download/mesa3d/opengl32.dll";
-    int res = MessageBoxA(NULL,
-        "Please Only Use when showing white square instead,\nand/or you don't want GPU usage.\n\nDownload Mesa3D software OpenGL renderer?",
-        "Install Mesa3D", MB_OKCANCEL | MB_ICONINFORMATION);
-    if(res != IDOK) return;
     g_mesaDL=new MesaDownloadState();
     g_mesaDL->progress=0.0f;
     g_mesaDL->done=0;
@@ -350,7 +368,24 @@ static bool runImGuiSettings() {
 
     static std::string latestTag="";
     static bool updateChecked=false;
-    static bool checkingNow=false;
+
+    if(!updateChecked){
+        // kick off check on background thread so UI doesn't freeze
+        struct { volatile bool done; std::string tag; } static checkState={false,""};
+        if(!checkState.done){
+            static bool checkStarted=false;
+            if(!checkStarted){
+                checkStarted=true;
+                CreateThread(NULL,0,[](void* p) -> DWORD {
+                    auto* cs=(decltype(&checkState))p;
+                    cs->tag=fetchLatestTag();
+                    cs->done=true;
+                    return 0;
+                },&checkState,0,NULL);
+            }
+        }
+        if(checkState.done){ latestTag=checkState.tag; updateChecked=true; }
+    }
 
     bool running=true;
     g_preview_clicked=false;
@@ -455,25 +490,37 @@ static bool runImGuiSettings() {
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
         ImGui::TextColored(ImVec4(0.4f,0.8f,1.0f,1.0f),"Updates");
-        ImGui::Checkbox("Check for updates on launch",&g_settings.auto_update_check);
-        ImGui::Checkbox("Auto install updates",&g_settings.auto_update_install);
         ImGui::Spacing();
-
-        if(ImGui::Button("Check for updates now",ImVec2(200,24))){
-            checkingNow=true;
-            latestTag=fetchLatestTag();
-            updateChecked=true;
-            checkingNow=false;
-        }
-        if(checkingNow) ImGui::TextColored(ImVec4(1,1,0,1),"Checking...");
-        if(updateChecked){
-            if(latestTag.empty()||latestTag==APP_VERSION)
+        if(g_updateDL && g_updateDL->done==0){
+            char lbl[16]; snprintf(lbl,sizeof(lbl),"%.0f%%",g_updateDL->progress*100.0f);
+            ImGui::ProgressBar(g_updateDL->progress,ImVec2(220,20),lbl);
+            ImGui::SameLine(); ImGui::TextColored(ImVec4(1,1,0,1),"Downloading update...");
+        } else if(g_updateDL && g_updateDL->done==1){
+            ImGui::TextColored(ImVec4(0,1,0,1),"Downloaded! Applying...");
+        } else if(g_updateDL && g_updateDL->done==-1){
+            ImGui::TextColored(ImVec4(1,0.3f,0.3f,1),"Download failed!");
+        } else {
+            if(!updateChecked){
+                ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1),"Checking for updates...");
+            } else if(latestTag.empty()||latestTag==APP_VERSION){
                 ImGui::TextColored(ImVec4(0,1,0,1),"You're up to date! (%s)",APP_VERSION);
-            else {
+            } else {
                 ImGui::TextColored(ImVec4(1,0.5f,0,1),"Update available: %s",latestTag.c_str());
                 ImGui::SameLine();
-                if(ImGui::Button("Install")){launchUpdater();running=false;}
+                if(ImGui::Button("Install")){
+                    g_updateDL=new UpdateDownloadState();
+                    g_updateDL->progress=0.0f;
+                    g_updateDL->done=0;
+                    g_updateDL->url="https://github.com/MalikHw/orbit-screensaver/releases/download/"+latestTag+"/orbit-update.zip";
+                    g_updateDL->destPath=getExeDir()+"\\orbit-update.zip";
+                    CreateThread(NULL,0,updateDownloadThread,g_updateDL,0,NULL);
+                }
             }
+        }
+        if(g_updateDL && g_updateDL->done==1){
+            saveCfg();
+            launchUpdater();
+            running=false;
         }
         ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
 
@@ -496,10 +543,19 @@ static bool runImGuiSettings() {
         } else if(g_mesaDL && g_mesaDL->done==-1){
             ImGui::TextColored(ImVec4(1,0.3f,0.3f,1),"Download failed!");
             ImGui::SameLine();
-            if(ImGui::SmallButton("Retry")){ delete g_mesaDL; g_mesaDL=nullptr; downloadMesa3D(); }
+            if(ImGui::SmallButton("Retry")){ delete g_mesaDL; g_mesaDL=nullptr; startMesaDownload(); }
         } else {
-            if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) downloadMesa3D();
+            if(ImGui::Button("Install Mesa3D",ImVec2(180,24))) ImGui::OpenPopup("mesa_confirm");
             if(ImGui::IsItemHovered()) ImGui::SetTooltip("Software OpenGL renderer - only if you get a white square!");
+        }
+        if(ImGui::BeginPopupModal("mesa_confirm",nullptr,ImGuiWindowFlags_AlwaysAutoResize)){
+            ImGui::TextColored(ImVec4(1,0.8f,0,1),"Please Only Use when showing white square instead,");
+            ImGui::Text("and/or you don't want GPU usage.");
+            ImGui::Spacing();
+            if(ImGui::Button("Download",ImVec2(100,24))){ startMesaDownload(); ImGui::CloseCurrentPopup(); }
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel",ImVec2(80,24))) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
         }
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f),"by MalikHw47");
@@ -741,14 +797,14 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     timeBeginPeriod(1);
     loadCfg();
 
-    if(g_settings.auto_update_check){
-        std::string latest=fetchLatestTag();
-        if(!latest.empty()&&latest!=APP_VERSION){
-            if(g_settings.auto_update_install){
-                launchUpdater(); timeEndPeriod(1); return 0;
-            } else {
-                showUpdateToast(latest);
-            }
+    // swap pending updater if exists
+    {
+        std::string exeDir=getExeDir();
+        std::string pending=exeDir+"\\updater.exe.pending";
+        std::string real=exeDir+"\\updater.exe";
+        if(GetFileAttributesA(pending.c_str())!=INVALID_FILE_ATTRIBUTES){
+            DeleteFileA(real.c_str());
+            MoveFileA(pending.c_str(),real.c_str());
         }
     }
 
