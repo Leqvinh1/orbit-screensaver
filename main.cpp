@@ -698,10 +698,13 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
             while(nextSpawn < numBalls && globalTime >= dropTime * nextSpawn){
                 float radius=(40+rand()%20)*g_settings.orb_scale;
-                int chosenOrb = rand()%NUM_ORBS; // Pick the image FIRST
+                int chosenOrb = rand()%NUM_ORBS; 
 
                 b2BodyDef bd;bd.type=b2_dynamicBody;
                 bd.position.Set(((float)W*0.8f/numBalls*(1+rand()%(numBalls*2)))/PPM,-250.0f/PPM);
+
+                bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f); 
+                
                 b2Body* body=world.CreateBody(&bd);
                 
                 b2FixtureDef fd;
@@ -730,7 +733,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 if((rand()%100) < g_settings.cube_chance){
                     float cubeW = PLAYER_SIZE * g_settings.orb_scale;
                     float cubeH = PLAYER_SIZE * g_settings.orb_scale;
-
+                    
                     if (cubeTex.ok) {
                         float tw = (float)cubeTex.w;
                         float th = (float)cubeTex.h;
@@ -739,7 +742,11 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                         cubeH *= (th / max_dim);
                     }
 
-                    b2BodyDef bd;bd.type=b2_dynamicBody;bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
+                    b2BodyDef bd;bd.type=b2_dynamicBody;
+                    bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
+
+                    bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f);
+                    
                     b2Body* body=world.CreateBody(&bd);
                     b2PolygonShape ps;
                     ps.SetAsBox((cubeW * 0.5f)/PPM, (cubeH * 0.5f)/PPM);
