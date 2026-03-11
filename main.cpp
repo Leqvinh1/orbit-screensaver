@@ -698,14 +698,30 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
 
             while(nextSpawn < numBalls && globalTime >= dropTime * nextSpawn){
                 float radius=(40+rand()%20)*g_settings.orb_scale;
+                int chosenOrb = rand()%NUM_ORBS; // Pick the image FIRST
+
                 b2BodyDef bd;bd.type=b2_dynamicBody;
                 bd.position.Set(((float)W*0.8f/numBalls*(1+rand()%(numBalls*2)))/PPM,-250.0f/PPM);
                 b2Body* body=world.CreateBody(&bd);
-                b2CircleShape cs;cs.m_radius=radius/PPM;
-                b2FixtureDef fd;fd.shape=&cs;fd.density=1.0f;fd.restitution=0.5f;fd.friction=1.0f;
+                
+                b2FixtureDef fd;
+                fd.density=1.0f; fd.restitution=0.5f; fd.friction=1.0f;
+
+                b2CircleShape cs;
+                b2PolygonShape ps;
+
+                if (chosenOrb == 10) {
+                    ps.SetAsBox(radius/PPM, radius/PPM);
+                    fd.shape=&ps;
+                } else {
+                    cs.m_radius=radius/PPM;
+                    fd.shape=&cs;
+                }
+
                 body->CreateFixture(&fd);
                 body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
-                Ball ball;ball.body=body;ball.radius=radius;ball.orbIdx=rand()%NUM_ORBS;ball.isPlayer=false;
+                
+                Ball ball; ball.body=body; ball.radius=radius; ball.orbIdx=chosenOrb; ball.isPlayer=false;
                 balls.push_back(ball);
                 nextSpawn++;
             }
