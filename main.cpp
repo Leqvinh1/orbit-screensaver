@@ -44,7 +44,7 @@
 #define FIT_ZOOM    1
 #define FIT_TILE    2
 
-#define NUM_ORBS    10
+#define NUM_ORBS    11
 #define PPM         40.0f
 #define PLAYER_SIZE 80
 
@@ -766,7 +766,15 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                     else{glColor3f(0.78f,0.39f,0.39f);glPushMatrix();glTranslatef(px,py,0);glRotatef(-ang,0,0,1);float h2=s/2;glBegin(GL_QUADS);glVertex2f(-h2,-h2);glVertex2f(h2,-h2);glVertex2f(h2,h2);glVertex2f(-h2,h2);glEnd();glPopMatrix();glColor3f(1,1,1);}
                 } else {
                     float d=b.radius*2;
-                    if(orbTex[b.orbIdx].ok) drawTexturedQuad(orbTex[b.orbIdx].id,px,py,d,d,ang);
+                    if(orbTex[b.orbIdx].ok) {
+                        float tw = (float)orbTex[b.orbIdx].w;
+                        float th = (float)orbTex[b.orbIdx].h;
+                        float max_dim = fmaxf(tw, th);
+                        float draw_w = d * (tw / max_dim);
+                        float draw_h = d * (th / max_dim);
+                        
+                        drawTexturedQuad(orbTex[b.orbIdx].id, px, py, draw_w, draw_h, ang);
+                    }
                     else drawCircleFallback(px,py,b.radius);
                 }
             }
