@@ -743,7 +743,9 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                     }
 
                     b2BodyDef bd;bd.type=b2_dynamicBody;
-                    bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
+                    float randomX = (float)(rand() % W);
+                    float randomY = (float)(rand() % (H / 2));
+                    bd.position.Set(randomX / PPM, randomY / PPM);
 
                     bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f);
                     
