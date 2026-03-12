@@ -723,7 +723,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                     float h_scale = 138.0f / 155.0f;
                     vertices[0].Set(radius/PPM, 0.0f); 
                     vertices[1].Set(-radius/PPM, (radius * h_scale)/PPM); 
-                    vvertices[2].Set(-radius/PPM, -(radius * h_scale)/PPM); 
+                    vertices[2].Set(-radius/PPM, -(radius * h_scale)/PPM); 
                     
                     ps.Set(vertices, 3);
                     fd.shape=&ps;
