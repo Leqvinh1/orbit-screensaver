@@ -677,6 +677,10 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
         int globalTime=0;bool fillingDone=false,draining=false;
         int nextSpawn=0;
         bool playerSpawned=false;
+        
+        // Picks a random depth between 50% and 90% for the cube to drop at
+        int randomDropPoint = (int)(numBalls * ((50 + rand() % 41) / 100.0f));
+        
         Uint32 allSpawnedAt=0;
         SDL_Point lastMouse;SDL_GetMouseState(&lastMouse.x,&lastMouse.y);
         int grace=60;
@@ -696,16 +700,6 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             }
             if(isPreview&&parentHwnd&&!IsWindow(parentHwnd)){running=false;simRunning=false;}
 
-            int nextSpawn=0;
-            bool playerSpawned=false;
-            Uint32 allSpawnedAt=0;
-            int nextSpawn=0;
-            bool playerSpawned=false;
-        
-            // Picks a random depth between 50% and 90% for the cube to drop at
-            int randomDropPoint = (int)(numBalls * ((50 + rand() % 41) / 100.0f));
-        
-            Uint32 allSpawnedAt=0;
             while(nextSpawn < numBalls && globalTime >= dropTime * nextSpawn){
                 float radius=(40+rand()%20)*g_settings.orb_scale;
                 int chosenOrb = rand()%NUM_ORBS; 
@@ -738,6 +732,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 balls.push_back(ball);
                 nextSpawn++;
             }
+            // Use our new random drop point instead of a hardcoded percentage
             if(!playerSpawned && nextSpawn >= randomDropPoint){
                 playerSpawned=true;
                 if((rand()%100) < g_settings.cube_chance){
