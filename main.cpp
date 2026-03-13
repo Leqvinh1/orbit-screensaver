@@ -679,7 +679,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
         bool playerSpawned=false;
         
         // Picks a random depth between 50% and 90% for the cube to drop at
-        int randomDropPoint = (int)(numBalls * ((50 + rand() % 41) / 100.0f));
+        int randomDropPoint = (int)(numBalls * ((60 + rand() % 36) / 100.0f));
         
         Uint32 allSpawnedAt=0;
         SDL_Point lastMouse;SDL_GetMouseState(&lastMouse.x,&lastMouse.y);
