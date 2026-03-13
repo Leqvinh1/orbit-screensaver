@@ -696,6 +696,16 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
             }
             if(isPreview&&parentHwnd&&!IsWindow(parentHwnd)){running=false;simRunning=false;}
 
+            int nextSpawn=0;
+            bool playerSpawned=false;
+            Uint32 allSpawnedAt=0;
+            int nextSpawn=0;
+            bool playerSpawned=false;
+        
+            // Picks a random depth between 50% and 90% for the cube to drop at
+            int randomDropPoint = (int)(numBalls * ((50 + rand() % 41) / 100.0f));
+        
+            Uint32 allSpawnedAt=0;
             while(nextSpawn < numBalls && globalTime >= dropTime * nextSpawn){
                 float radius=(40+rand()%20)*g_settings.orb_scale;
                 int chosenOrb = rand()%NUM_ORBS; 
@@ -728,7 +738,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 balls.push_back(ball);
                 nextSpawn++;
             }
-            if(!playerSpawned && nextSpawn >= numBalls/2){
+            if(!playerSpawned && nextSpawn >= randomDropPoint){
                 playerSpawned=true;
                 if((rand()%100) < g_settings.cube_chance){
                     float cubeW = PLAYER_SIZE * g_settings.orb_scale;
@@ -743,8 +753,14 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                     }
 
                     b2BodyDef bd;bd.type=b2_dynamicBody;
-                    bd.position.Set((float)W*0.5f/PPM,-400.0f/PPM);
-
+                    bd.bullet = true; 
+                    
+                    // Pick a random X position (keeping it 10% away from the left and right walls)
+                    float randomX = (float)W * 0.1f + (float)(rand() % (int)(W * 0.8f));
+                    
+                    // Spawn it off-screen at -400 Y so it falls naturally
+                    bd.position.Set(randomX / PPM, -400.0f / PPM);
+                    
                     bd.angle = (float)(rand() % 360) * ((float)M_PI / 180.0f);
                     
                     b2Body* body=world.CreateBody(&bd);
