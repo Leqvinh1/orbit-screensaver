@@ -712,59 +712,16 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 b2FixtureDef fd;
                 fd.density=1.0f; fd.restitution=0.5f; fd.friction=1.0f;
 
-                int GREEN_ARROW = 0; 
-                int RED_ARROW = 1;
-
                 b2CircleShape cs;
                 b2PolygonShape ps;
 
                 if (chosenOrb == 10) {
                     ps.SetAsBox(radius/PPM, radius/PPM);
                     fd.shape=&ps;
-                } else if (chosenOrb == GREEN_ARROW || chosenOrb == RED_ARROW) {
-                    // 2. THE COMPOUND SHAPE (Ring + V-Shape)
-                    
-                    // --- PART A: THE WHITE RING ---
-                    b2CircleShape ringShape;
-                    // The ring is slightly smaller than the outer arrow tips
-                    ringShape.m_radius = (radius * 0.80f) / PPM; 
-                    fd.shape = &ringShape;
-                    body->CreateFixture(&fd); // Glue the ring on
-
-                    // --- PART B: TOP ARM ---
-                    b2PolygonShape topArm;
-                    b2Vec2 topVerts[4];
-                    topVerts[0].Set(radius/PPM, 0.0f);                           // Right Tip
-                    topVerts[1].Set(-radius/PPM, (radius * 0.89f)/PPM);          // Top Outer Tail
-                    topVerts[2].Set(-radius/PPM, (radius * 0.38f)/PPM);          // Top Inner Tail
-                    topVerts[3].Set(-(radius * 0.25f)/PPM, 0.0f);                // Inner Dent
-                    topArm.Set(topVerts, 4);
-                    fd.shape = &topArm;
-                    body->CreateFixture(&fd); // Glue the top arm on
-
-                    // --- PART C: BOTTOM ARM ---
-                    b2PolygonShape bottomArm;
-                    b2Vec2 bottomVerts[4];
-                    bottomVerts[0].Set(radius/PPM, 0.0f);                        // Right Tip
-                    bottomVerts[1].Set(-(radius * 0.25f)/PPM, 0.0f);             // Inner Dent
-                    bottomVerts[2].Set(-radius/PPM, -(radius * 0.38f)/PPM);      // Bottom Inner Tail
-                    bottomVerts[3].Set(-radius/PPM, -(radius * 0.89f)/PPM);      // Bottom Outer Tail
-                    bottomArm.Set(bottomVerts, 4);
-                    fd.shape = &bottomArm;
-                    body->CreateFixture(&fd); // Glue the bottom arm on
-                } 
-                else {
-                    // 3. The Default Circles (Everything else)
-                    b2CircleShape cs;
+                } else {
                     cs.m_radius=radius/PPM;
                     fd.shape=&cs;
-                    body->CreateFixture(&fd); 
                 }
-
-                // Apply the starting push
-                body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
-                // Apply the starting push
-                body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
 
                 body->CreateFixture(&fd);
                 body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
