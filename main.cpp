@@ -721,12 +721,7 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 if (chosenOrb == 10) {
                     ps.SetAsBox(radius/PPM, radius/PPM);
                     fd.shape=&ps;
-                } else {
-                    cs.m_radius=radius/PPM;
-                    fd.shape=&cs;
-                }
-
-                else if (chosenOrb == GREEN_ARROW || chosenOrb == RED_ARROW) {
+                } else if (chosenOrb == GREEN_ARROW || chosenOrb == RED_ARROW) {
                     // 2. THE COMPOUND SHAPE (Ring + V-Shape)
                     
                     // --- PART A: THE WHITE RING ---
@@ -766,6 +761,8 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                     body->CreateFixture(&fd); 
                 }
 
+                // Apply the starting push
+                body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
                 // Apply the starting push
                 body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
 
