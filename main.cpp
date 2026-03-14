@@ -712,51 +712,16 @@ static void runScreensaver(bool isPreview, void* previewHandle) {
                 b2FixtureDef fd;
                 fd.density=1.0f; fd.restitution=0.5f; fd.friction=1.0f;
 
-                int GREEN_ARROW = 0; 
-                int RED_ARROW = 1;
-
                 b2CircleShape cs;
                 b2PolygonShape ps;
 
                 if (chosenOrb == 10) {
                     ps.SetAsBox(radius/PPM, radius/PPM);
                     fd.shape=&ps;
-                } else if (chosenOrb == GREEN_ARROW || chosenOrb == RED_ARROW) {
-                    // 2. The Solid "Thick Beam" V-Shape
-                    
-                    // SetAsBox parameters: (half_length, half_thickness, center_offset_point, angle_in_radians)
-                    
-                    // --- TOP ARM (Tilted down to the right) ---
-                    b2PolygonShape topArm;
-                    topArm.SetAsBox(
-                        (radius * 1.1f) / PPM,                                   // Length of the beam
-                        (radius * 0.35f) / PPM,                                  // Thickness of the beam
-                        b2Vec2(-(radius * 0.1f) / PPM, (radius * 0.45f) / PPM),  // Center point of this arm
-                        -0.65f                                                   // Tilt angle
-                    );
-                    fd.shape = &topArm;
-                    body->CreateFixture(&fd);
-
-                    // --- BOTTOM ARM (Tilted up to the right) ---
-                    b2PolygonShape bottomArm;
-                    bottomArm.SetAsBox(
-                        (radius * 1.1f) / PPM,                                   // Length of the beam
-                        (radius * 0.35f) / PPM,                                  // Thickness of the beam
-                        b2Vec2(-(radius * 0.1f) / PPM, -(radius * 0.45f) / PPM), // Center point of this arm
-                        0.65f                                                    // Tilt angle
-                    );
-                    fd.shape = &bottomArm;
-                    body->CreateFixture(&fd);
-                } 
-                else {
-                    // 3. The Default Circles (Everything else)
-                    b2CircleShape cs;
+                } else {
                     cs.m_radius=radius/PPM;
                     fd.shape=&cs;
-                    body->CreateFixture(&fd); 
                 }
-                // Apply the starting push
-                body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
 
                 body->CreateFixture(&fd);
                 body->ApplyLinearImpulse(b2Vec2((10-rand()%21)*0.05f,0),body->GetWorldCenter(),true);
